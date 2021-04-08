@@ -11,21 +11,33 @@ This script does that for me. See `Example` below for a better idea of what I
 am talking about.
 
 ## Usage
-`stl2zip /path/to/models`
+Help text:
+`stl2zip.py --help`originals after successful compressing
 
-`stl2zip --ascii-only /path/to/models`
+Standard usage (compresses all models but keeps the originals)
+`stl2zip.py /path/to/models`
+
 Only compress ASCII formatted STL files. These compress down really well, like
-~90%, whereas binary formatted STL files compress down around 30%.
+~90%, whereas binary formatted STL files compress down around 20-30%.
+`stl2zip.py --ascii-only /path/to/models`
 
-`stl2zip --delete /path/to/models`
-Deletes the 3D model files after they have been successfully zipped.
+Compress all model files and deletes the originals after successful compressing
+`stl2zip.py --delete /path/to/models`
 
 ## Installation
 
+Prerequisites
 You just need Python3 installed.  I used 3.8, but it might work on anything
 newer than 3.3.
 
 It should work on Linux, macOS, and Windows but I have only tested on macOS.
+
+Install Prerequisites with:
+```
+pip install -r requirements.txt
+```
+
+You're now ready to roll.
 
 ## Example
 Let's say I have this directory structure for my models. I actually have

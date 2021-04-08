@@ -13,22 +13,34 @@
 import click
 import os
 from pathlib import Path
-import re
 import time
 from zipfile import ZipFile, ZIP_DEFLATED
 
+# Setup conventional file size units
 KB = 1024
 MB = KB * KB
 MiB = 1000 * KB
 GB = KB * MB
 GiB = 1000 * MB
 
+# 3D model file extensions used in the glob search
 #PATTERNS = [".stl", ".obj", ".3mf"]
 PATTERNS = [".stl"]
 
+# Compression algorithm. See Python ZipFile docs for more options.
 COMPRESSION = ZIP_DEFLATED
 
+
 def gen_stats(source, counter, ascii_only):
+    """
+    Collects file statistics before compression, returns a generator of the
+    same input filenames.
+
+    Keyword arguments:
+    source -- iterable of filenames
+    counter -- pre-initialized dict for collecting file statistics
+    ascii_only -- boolean flag, True == only compress ASCII models
+    """
     for filename in source:
         if ascii_only:
             # test filename is ascii
@@ -45,7 +57,14 @@ def gen_stats(source, counter, ascii_only):
 
 
 def gen_zip(source, counter, delete):
-    """ To avoid zipping the whole source path, we chdir first before zipping
+    """
+    Compresses files and returns a generator of tuples of the input filename
+    and the zip filename.
+
+    Keyword arguments:
+    source -- iterable of filenames
+    counter -- pre-initialized dict for collecting file statistics
+    delete -- boolean flag, True == delete filename
     """
     for filename in source:
         zipname = filename.with_suffix(".zip")
@@ -53,6 +72,7 @@ def gen_zip(source, counter, delete):
         curdir = os.getcwd()
         try:
             with ZipFile(zipname, 'w', compression=COMPRESSION) as myzip:
+                # To avoid zipping the whole source path, we chdir first
                 os.chdir(filename.parent)
                 myzip.write(filename.name)
                 counter['compressed_count'] += 1
@@ -60,6 +80,7 @@ def gen_zip(source, counter, delete):
             print(f"Failed to create {zipname}")
             raise
         else:
+            # Return to previous working dir so the rest of the script works
             os.chdir(curdir)
             if delete:
                 filename.unlink()
@@ -68,6 +89,14 @@ def gen_zip(source, counter, delete):
 
 
 def gen_stats2(source, counter):
+    """
+    Collects file statistics after compression, returns a generator of the
+    same input filenames tuple.
+
+    Keyword arguments:
+    source -- iterable of filename tuples (model file, zip file)
+    counter -- pre-initialized dict for collecting file statistics
+    """
     for filename, zipname in source:
         counter['compressed_bytes'] += os.path.getsize(zipname.absolute())
         yield filename, zipname
@@ -80,21 +109,31 @@ def gen_stats2(source, counter):
 @click.option('--delete', is_flag=True, default=False,
         help="Delete models after compressing")
 def main(path, ascii_only, delete, patterns=PATTERNS):
+    """
+    Entry point of this script
+
+    Keyword arguments:
+    path -- top level directory path where walking and compressing begins
+    ascii_only -- boolean, True == compress only ASCII-format model files
+    delete -- boolean, True == delete source model files after compression
+    patterns -- iterable of 3D model file extensions
+    """
+    # initialize our stat counter
+    counters = {x: {'count': 0, 'compressed_count': 0, 'uncompressed_bytes': 0,
+        'compressed_bytes': 0} for x in patterns}
+    # setup all paths to be portable across platforms
     top_dir = Path(path)
-    counters = {x: {'count': 0, 'compressed_count': 0, 'uncompressed_bytes': 0, 'compressed_bytes': 0} for x in patterns}
-    regex = re.compile(r'^(\s+)$')
 
     print(f"Using path: {top_dir}")
-
     start = time.time()
     for pattern in patterns:
-        # Setup pipeline:
+        # Setup processing pipeline:
         filtered_files = top_dir.glob(f"**/*{pattern}")
         stat_files = gen_stats(filtered_files, counters[pattern], ascii_only)
         zip_files = gen_zip(stat_files, counters[pattern], delete)
         pipeline = gen_stats2(zip_files, counters[pattern])
 
-        # 'Pull' the pipeline 
+        # 'Pull' from the pipeline. We don't care about the output.
         [x for x in pipeline]
     elapsed = time.time() - start
 
